@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador CNAB 240 - Banco Inter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script async src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Configura o worker do PDF.js para evitar warnings
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="cnab/utils.js"></script>
+    <script src="cnab/Cnab240InterBuilder.js"></script>
+    <!-- Os scripts app.js e config.js agora são carregados no final do body -->
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📋 Gerador CNAB 240 - Banco Inter</h1>
+                <p>Gere arquivos de remessa de pagamentos facilmente</p>
+            </div>
+            <div class="api-config">
+                <button id="btnAbrirConfig" class="btn-config">⚙️ Configurar API</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <div class="grid">
+                <!-- Seção 1: Dados da Empresa -->
+                <section class="card">
+                    <h2>🏢 Dados da Empresa</h2>
+                    <form id="empresaForm">
+                        <div class="form-group">
+                            <label for="nomeEmpresa">Nome da Empresa *</label>
+                            <input type="text" id="nomeEmpresa" placeholder="MINHA EMPRESA LTDA" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cnpj">CNPJ *</label>
+                            <input type="text" id="cnpj" placeholder="12.345.678/0001-00" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="agencia">Agência *</label>
+                                <input type="text" id="agencia" placeholder="0001" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="conta">Conta *</label>
+                                <input type="text" id="conta" placeholder="12345678901234" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="dv">DV *</label>
+                                <input type="text" id="dv" placeholder="5" required>
+                            </div>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Seção 2: Upload OCR de Boletos -->
+                <section class="card">
+                    <h2>📸 Upload de Boletos (OCR com IA)</h2>
+                    <div class="form-group">
+                        <label for="uploadBoletos">Selecione boletos em PDF ou imagens *</label>
+                        <input type="file" id="uploadBoletos" multiple accept="image/*,.pdf">
+                        <p class="hint">Você pode selecionar PDFs ou imagens (JPEG, PNG, etc.)</p>
+                    </div>
+                    <div id="processadorStatus" class="processador-status" style="display: none;">
+                        <p id="processadorMensagem">Processando imagem...</p>
+                        <div class="progress-bar">
+                            <div id="progressoBar" class="progresso"></div>
+                        </div>
+                    </div>
+                    <button type="button" id="btnProcessarBoletos" class="btn-primary">
+                        🔍 Processar Boletos com IA
+                    </button>
+                </section>
+            </div>
+
+            <!-- Lista de Boletos -->
+            <section class="card">
+                <h2>📊 Boletos Adicionados (<span id="totalPagamentos">0</span>)</h2>
+                <div id="listaBoletos" class="tabela-container">
+                    <p class="vazio">Nenhum boleto adicionado ainda</p>
+                </div>
+            </section>
+
+            <!-- Gerar CNAB -->
+            <section class="card card-acao">
+                <div class="acoes">
+                    <button id="btnGerarCNAB" class="btn-primary btn-large">
+                        🚀 Gerar Arquivo CNAB 240
+                    </button>
+                    <button id="btnLimparTudo" class="btn-secondary">
+                        🗑️ Limpar Tudo
+                    </button>
+                </div>
+            </section>
+
+            <!-- Resultado -->
+            <section class="card" id="resultadoSection" style="display: none;">
+                <h2>✅ Arquivo CNAB Gerado!</h2>
+                <div class="resultado-info">
+                    <p><strong>Valor Total:</strong> R$ <span id="valorTotal">0.00</span></p>
+                    <p><strong>Quantidade de Linhas:</strong> <span id="qtdLinhas">0</span></p>
+                </div>
+                
+                <div class="textarea-container">
+                    <label for="cnabOutput">Arquivo CNAB 240:</label>
+                    <textarea id="cnabOutput" readonly></textarea>
+                </div>
+
+                <div class="acoes">
+                    <button id="btnCopiarCNAB" class="btn-primary">
+                        📋 Copiar para Clipboard
+                    </button>
+                    <button id="btnBaixarCNAB" class="btn-secondary">
+                        ⬇️ Baixar Arquivo
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Gerador CNAB 240 - Banco Inter | v2.0.0 (Gemini) | 2026</p>
+        </footer>
+    </div>
+
+    <!-- Modal Configuração API -->
+    <div id="modalAPI" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Configurar Google AI API</h2>
+                <button id="btnFecharConfig" class="modal-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="googleApiKey">Chave da API Google AI (Gemini) *</label>
+                    <input type="password" id="googleApiKey" placeholder="Cole sua chave aqui" required>
+                    <p class="hint">Obtenha sua chave em: <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="checkMostrarSenha">
+                        Mostrar chave
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnCancelarConfig" class="btn-secondary">Cancelar</button>
+                <button id="btnSalvarConfig" class="btn-primary">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SDK do Google Gemini -->
+    <script src="https://sdk.cloud.google.com/ai/generative-ai/api/v1/generative-ai-api.min.js"></script>
+
+    <!-- Scripts carregados no final para garantir que o DOM esteja pronto -->
+    <script src="config.js" type="module"></script>
+    <script src="app.js" type="module"></script>
+</body>
+</html>
