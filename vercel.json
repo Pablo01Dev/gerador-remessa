@@ -4,30 +4,6 @@
     {
       "src": "server.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "styles.css",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "app.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "config.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "cnab/Cnab240InterBuilder.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "cnab/utils.js",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -37,7 +13,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/$1"
     }
   ]
 }
