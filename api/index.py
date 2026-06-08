@@ -60,7 +60,7 @@ def processar_ocr():
         ]
         
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=[prompt_text, types.Part.from_bytes(data=image_bytes, mime_type="image/png")],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
