@@ -77,6 +77,8 @@ window.processarBoletos = async function() {
         let totalUnidades = await contarUnidadesDeProcessamento(arquivosSelecionados);
         let unidadesProcessadas = 0;
 
+        let houveErro = false;
+
         for (const file of arquivosSelecionados) {
             const onUnidadeProcessada = () => {
                 unidadesProcessadas++;
@@ -94,15 +96,20 @@ window.processarBoletos = async function() {
             } catch (error) {
                 console.error(`Erro ao processar ${file.name}:`, error);
                 mensagemDiv.textContent = `Erro em ${file.name}: ${error.message}`;
+                houveErro = true;
+                break; // Para o processamento em caso de erro
             }
         }
 
-        progressoBar.style.width = '100%';
-        mensagemDiv.textContent = `✅ ${boletos.length} boleto(s) processado(s)!`;
+        if (!houveErro) {
+            progressoBar.style.width = '100%';
+            mensagemDiv.textContent = `✅ ${boletos.length} boleto(s) processado(s)!`;
+        }
+        
         atualizarListaBoletos();
         fileInput.value = ''; 
 
-        setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
+        setTimeout(() => { statusDiv.style.display = 'none'; }, houveErro ? 8000 : 3000);
 
     } catch (error) {
         alert(`❌ Erro geral:\n${error.message}`);
@@ -138,7 +145,10 @@ async function processarImagem(file) {
                 boletos.push(dadosFormatados);
             }
         }
-    } catch (e) { console.warn(`⚠️ Erro na imagem ${file.name}:`, e); }
+    } catch (e) { 
+        console.warn(`⚠️ Erro na imagem ${file.name}:`, e); 
+        throw e;
+    }
 }
 
 async function processarPDF(file, mensagemDiv, onPageProcessed) {
@@ -168,7 +178,10 @@ async function processarPDF(file, mensagemDiv, onPageProcessed) {
                         boletos.push(dadosFormatados);
                     }
                 }
-            } catch (innerError) { console.warn(`Falha pag ${pageNum}`, innerError); }
+            } catch (innerError) { 
+                console.warn(`Falha pag ${pageNum}`, innerError); 
+                throw innerError;
+            }
             
             onPageProcessed();
             atualizarListaBoletos();
@@ -195,30 +208,49 @@ function upscaleImage(file) {
 }
 
 async function processarBoletoComGemini(base64Data) {
+    let response;
     try {
         const apiKey = localStorage.getItem('GOOGLE_VISION_API_KEY') || null;
-        const response = await fetch('/api/ocr', {
+        response = await fetch('/api/ocr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image: base64Data, apiKey: apiKey }),
         });
+    } catch (networkError) {
+        throw new Error('Erro de rede ao conectar com o backend.');
+    }
 
-        if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
-        const result = await response.json();
+    if (!response.ok) {
+        let errorMessage = `Erro HTTP ${response.status}`;
+        try {
+            const errData = await response.json();
+            if (errData.details) {
+                errorMessage = `API Gemini Erro: ${errData.details}`;
+            } else if (errData.error) {
+                errorMessage = errData.error;
+            }
+        } catch(e) {}
+        throw new Error(errorMessage);
+    }
 
-        if (result.success && result.texto) {
-            let jsonStr = result.texto.replace(/```json/g, '').replace(/```/g, '');
-            const firstBrace = jsonStr.indexOf('{');
-            const lastBrace = jsonStr.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
+    const result = await response.json();
+
+    if (result.success && result.texto) {
+        // Expressão regular aprimorada para lidar com markdown e quebras de linha
+        let jsonStr = result.texto.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+        const firstBrace = jsonStr.indexOf('{');
+        const lastBrace = jsonStr.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            try {
                 return JSON.parse(jsonStr.substring(firstBrace, lastBrace + 1));
+            } catch (jsonErr) {
+                console.error("Conteúdo retornado:", jsonStr);
+                throw new Error(`JSON inválido retornado pela IA: ${jsonErr.message}`);
             }
         }
-        throw new Error('JSON inválido');
-    } catch (error) {
-        console.error("API Error:", error);
-        return null;
     }
+    throw new Error('Falha ao processar dados da IA (Sem JSON válido na resposta)');
 }
 
 function formatarDadosBoleto(dadosJSON, nomeOriginalArquivo, numeroPagina = null) {

@@ -51,17 +51,36 @@ def processar_ocr():
         Retorne apenas JSON.
         """
         
+        # Filtros de segurança desativados para evitar bloqueios de conteúdo sensível (PII, dados financeiros)
+        safety_settings = [
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+        ]
+        
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-1.5-flash',
             contents=[prompt_text, types.Part.from_bytes(data=image_bytes, mime_type="image/png")],
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                safety_settings=safety_settings
+            )
         )
         
         return jsonify({'success': True, 'texto': response.text})
     
     except Exception as e:
-        print(f"Erro: {e}")
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        erro_detalhado = str(e)
+        status_code = getattr(e, 'code', 500)
+        print(f"Erro Detalhado API Gemini: [{status_code}] {erro_detalhado}")
+        return jsonify({
+            'error': 'Falha na integração com Gemini', 
+            'details': erro_detalhado,
+            'status_code': status_code
+        }), 500
 
 @app.route('/api/health', methods=['GET'])
 def health():
