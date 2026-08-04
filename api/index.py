@@ -29,6 +29,7 @@ def static_files(path):
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 @app.route('/api/ocr', methods=['POST'])
+@app.route('/api/index.py', methods=['POST'])
 def processar_ocr():
     try:
         dados = request.json
