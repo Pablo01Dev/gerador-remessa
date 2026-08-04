@@ -49,4 +49,17 @@ test('o builder CNAB400 gera linhas com 400 caracteres', () => {
 
   assert.ok(linhas.length >= 3);
   linhas.forEach((linha) => assert.equal(linha.length, 400));
+
+  const header = linhas[0];
+  assert.equal(header[0], '0');
+  assert.equal(header[1], '1');
+  assert.equal(header.substring(2, 9), 'REMESSA');
+  assert.equal(header.substring(9, 11), '01');
+  assert.equal(header.substring(76, 79), '077');
+
+  const detalhe = linhas[1];
+  assert.equal(detalhe[0], '1');
+  assert.equal(detalhe.substring(20, 23), '112');
+  assert.equal(detalhe.substring(62, 65), '001');
+  assert.equal(detalhe.substring(108, 110), '01');
 });

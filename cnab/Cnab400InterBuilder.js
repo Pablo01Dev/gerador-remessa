@@ -1,31 +1,30 @@
 class Cnab400InterBuilder {
   constructor(dadosEmpresa = {}) {
     this.linhas = [];
-    this.sequenciaRegistro = 1; // Sequencial geral da linha no arquivo
+    this.sequenciaRegistro = 1;
     this.totalValor = 0;
     this.quantidadePagamentos = 0;
 
-    // Dados da empresa (cedente/pagador)
     this.empresa = {
       nome: dadosEmpresa.nome || '',
       cnpj: dadosEmpresa.cnpj || '',
       agencia: dadosEmpresa.agencia || '',
       contaBancaria: dadosEmpresa.conta_bancaria || dadosEmpresa.contaBancaria || '',
       dv: dadosEmpresa.dv || '',
-      codigoBanco: '077', // Banco Inter
+      codigoBanco: '077',
     };
 
     this.pagamentos = [];
   }
 
-  // --- Métodos Auxiliares Internos ---
-
   padLeft(value, length, char = '0') {
-    return (char.repeat(length) + value).slice(-length);
+    const text = String(value ?? '');
+    return (char.repeat(length) + text).slice(-length);
   }
 
   padRight(value, length, char = ' ') {
-    return (value + char.repeat(length)).slice(0, length);
+    const text = String(value ?? '');
+    return (text + char.repeat(length)).slice(0, length);
   }
 
   onlyNumbers(str) {
@@ -33,53 +32,57 @@ class Cnab400InterBuilder {
   }
 
   removeAccents(str) {
-    return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+    return str ? str.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+  }
+
+  sanitizeAlpha(str, length) {
+    const texto = this.removeAccents(str || '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9 ]/g, ' ')
+      .trim();
+
+    return this.padRight(texto, length, ' ');
   }
 
   formatDate6(dateStr) {
-    // Retorna formato DDMMAA (Padrão para Header no CNAB 400)
     if (!dateStr) return '000000';
     try {
-      const [ano, mes, dia] = dateStr.split('-');
+      const [ano, mes, dia] = String(dateStr).split('-');
       if (!ano || !mes || !dia) return '000000';
       return `${dia}${mes}${ano.substring(2, 4)}`;
-    } catch (e) { return '000000'; }
+    } catch (e) {
+      return '000000';
+    }
   }
 
-  formatDate8(dateStr) {
-    // Retorna formato DDMMAAAA (Alguns detalhes no CNAB 400 exigem 8 dígitos)
-    if (!dateStr) return '00000000';
-    try {
-      const [ano, mes, dia] = dateStr.split('-');
-      if (!ano || !mes || !dia) return '00000000';
-      return `${dia}${mes}${ano}`;
-    } catch (e) { return '00000000'; }
-  }
+  formatMoneyCents(value) {
+    if (value === undefined || value === null || value === '') return this.padLeft('0', 13, '0');
 
-  formatMoney(value) {
-    if (value === undefined || value === null) return '000000000000000';
-    const num = parseFloat(value).toFixed(2).replace('.', '');
-    return this.padLeft(num, 15, '0');
+    const numero = parseFloat(String(value).replace(',', '.'));
+    const cents = Math.round(Math.abs(numero) * 100);
+    return this.padLeft(cents.toString(), 13, '0');
   }
-
-  // --- Lógica Principal ---
 
   addBoletoPayment(dadosBoleto) {
     this.pagamentos.push({
-      linhaDigitavel: dadosBoleto.linhaDigitavel,
-      valor: dadosBoleto.valor,
-      vencimento: dadosBoleto.vencimento,
-      sacado: dadosBoleto.sacado, 
+      linhaDigitavel: dadosBoleto.linhaDigitavel || '',
+      valor: dadosBoleto.valor || '0.00',
+      vencimento: dadosBoleto.vencimento || '',
+      sacado: dadosBoleto.sacado || {},
       seuNumero: dadosBoleto.seuNumero || dadosBoleto.descricao || '',
+      numeroDocumento: dadosBoleto.numeroDocumento || dadosBoleto.seuNumero || dadosBoleto.descricao || '',
+      mensagem: dadosBoleto.mensagem || dadosBoleto.descricao || 'REFERENTE AO ALUGUEL MENSAL',
+      pagador: dadosBoleto.pagador || dadosBoleto.sacado || {},
     });
 
-    this.totalValor += parseFloat(dadosBoleto.valor);
+    this.totalValor += parseFloat(dadosBoleto.valor || 0);
     this.quantidadePagamentos++;
   }
 
   build() {
     this.linhas = [];
-    this.sequenciaRegistro = 1; // Reinicia a cada build
+    this.sequenciaRegistro = 1;
+    this.quantidadeBoletos = this.pagamentos.length;
 
     this.addHeader();
 
@@ -92,109 +95,86 @@ class Cnab400InterBuilder {
     return this.linhas.join('\r\n');
   }
 
-  // --- Segmentos CNAB 400 ---
-
   addHeader() {
     const hoje = new Date();
-    const dataGeracao = this.padLeft(hoje.getDate().toString(), 2) + 
-                        this.padLeft((hoje.getMonth() + 1).toString(), 2) + 
-                        hoje.getFullYear().toString().substring(2, 4); // DDMMAA
+    const dataGeracao = this.padLeft(hoje.getDate().toString(), 2) +
+      this.padLeft((hoje.getMonth() + 1).toString(), 2) +
+      hoje.getFullYear().toString().substring(2, 4);
 
     let linha = '';
-    
-    // 001-001: Identificação do Registro (0 = Header)
-    linha += '0'; 
-    // 002-002: Tipo de Operação (1 = Remessa)
-    linha += '1'; 
-    // 003-009: Identificação por Extenso
-    linha += this.padRight('REMESSA', 7); 
-    // 010-011: Código do Serviço (20 = Pagamento a Fornecedores/Títulos)
-    linha += '20'; 
-    // 012-026: Extenso do Serviço
-    linha += this.padRight('PAGAMENTO TITULOS', 15); 
-    
-    // 027-046: Dados da Empresa (Agência 5 + Conta 12 + DV 1 = 18. Preenchemos até 20)
-    const agConta = this.padLeft(this.onlyNumbers(this.empresa.agencia), 5) +
-                    this.padLeft(this.onlyNumbers(this.empresa.contaBancaria), 12) +
-                    this.padLeft(this.empresa.dv, 1);
-    linha += this.padRight(agConta, 20);
-    
-    // 047-076: Nome da Empresa (30 caracteres)
-    linha += this.padRight(this.removeAccents(this.empresa.nome).substring(0, 30), 30);
-    
-    // 077-079: Código do Banco
-    linha += '077'; 
-    // 080-094: Nome do Banco (15 caracteres)
-    linha += this.padRight('BANCO INTER', 15); 
-    // 095-100: Data de Gravação
-    linha += dataGeracao; 
-    
-    // 101-394: Espaços em Branco (294 posições)
-    linha += this.padRight('', 294); 
-    
-    // 395-400: Sequencial do Registro
-    linha += this.padLeft(this.sequenciaRegistro++, 6);
+    linha += '0';
+    linha += '1';
+    linha += this.sanitizeAlpha('REMESSA', 7);
+    linha += '01';
+    linha += this.sanitizeAlpha('COBRANCA', 15);
+    linha += this.padRight('', 20);
+    linha += this.sanitizeAlpha(this.empresa.nome, 30);
+    linha += '077';
+    linha += this.sanitizeAlpha('INTER', 15);
+    linha += dataGeracao;
+    linha += this.padRight('', 10);
+    linha += this.padLeft(this.sequenciaRegistro.toString(), 7, '0');
+    linha += this.padRight('', 277);
+    linha += this.padLeft(this.sequenciaRegistro.toString(), 6, '0');
 
-    // Garante que a linha tenha exatamente 400 posições e adiciona ao array
     this.linhas.push(this.padRight(linha, 400).substring(0, 400));
+    this.sequenciaRegistro++;
   }
 
   addDetalhe(pgto) {
+    const pagador = pgto.pagador || pgto.sacado || {};
+    const nomePagador = pagador.nome || this.empresa.nome || 'PAGADOR';
+    const docPagador = this.onlyNumbers(pagador.cpf_cnpj || '');
+    const tipoInscricao = docPagador.length >= 12 ? '02' : (docPagador.length === 11 ? '01' : '01');
+    const endereco = [pagador.endereco || '', pagador.cidade || '', pagador.uf || ''].join(' ').trim();
+    const cep = this.onlyNumbers(pagador.cep || '');
+
     let linha = '';
-    
-    // 001-001: Identificação do Registro (1 = Detalhe)
-    linha += '1'; 
-
-    // 002-017: Tipo de Inscrição e CNPJ (2 posições tipo + 14 posições documento)
-    const tipoInscEmpresa = this.empresa.cnpj.length > 11 ? '02' : '01'; // 01 CPF, 02 CNPJ
-    linha += tipoInscEmpresa;
-    linha += this.padLeft(this.onlyNumbers(this.empresa.cnpj), 14);
-
-    // 018-037: Seu Número / Identificação na Empresa (20 posições)
-    linha += this.padRight(pgto.seuNumero || '', 20);
-
-    // 038-084: Linha Digitável do Título a ser pago (47 posições)
-    // Removido o conversor de barras, usa os números puros da linha
-    const linhaDig = this.onlyNumbers(pgto.linhaDigitavel);
-    linha += this.padRight(linhaDig, 47, '0');
-
-    // 085-114: Nome do Beneficiário (Sacado no objeto) (30 posições)
-    const nomeBeneficiario = this.removeAccents(pgto.sacado.nome || 'BENEFICIARIO').substring(0, 30);
-    linha += this.padRight(nomeBeneficiario, 30);
-
-    // 115-122: Data de Vencimento (8 posições - DDMMAAAA)
-    linha += this.formatDate8(pgto.vencimento);
-
-    // 123-137: Valor do Título a ser Pago (15 posições, centavos implícitos)
-    linha += this.formatMoney(pgto.valor);
-
-    // 138-152: CPF/CNPJ do Beneficiário (15 posições)
-    const docBeneficiario = this.onlyNumbers(pgto.sacado.cpf_cnpj || '');
-    linha += this.padLeft(docBeneficiario, 15);
-
-    // 153-394: Restante da linha (242 posições, pode conter descontos, juros, etc. Deixamos em branco para layout base)
-    linha += this.padRight('', 242);
-
-    // 395-400: Sequencial do Registro
-    linha += this.padLeft(this.sequenciaRegistro++, 6);
+    linha += '1';
+    linha += this.padRight('', 19);
+    linha += '112';
+    linha += this.padLeft(this.onlyNumbers(this.empresa.agencia), 4, '0');
+    linha += this.padLeft(this.onlyNumbers(this.empresa.contaBancaria), 9, '0');
+    linha += this.padLeft(this.onlyNumbers(this.empresa.dv), 1, '0');
+    linha += this.sanitizeAlpha(pgto.seuNumero || pgto.descricao || '', 25);
+    linha += '001';
+    linha += '0';
+    linha += this.padLeft('', 23, '0');
+    linha += this.padLeft('', 11, '0');
+    linha += this.padRight('', 8);
+    linha += '01';
+    linha += this.sanitizeAlpha(pgto.numeroDocumento || pgto.seuNumero || pgto.descricao || '', 10);
+    linha += this.formatDate6(pgto.vencimento);
+    linha += this.formatMoneyCents(pgto.valor);
+    linha += '30';
+    linha += this.padRight('', 6);
+    linha += '01';
+    linha += 'N';
+    linha += this.padRight('', 9);
+    linha += '0';
+    linha += this.padLeft('', 23, '0');
+    linha += '0';
+    linha += this.padLeft('', 23, '0');
+    linha += this.padRight('', 13);
+    linha += tipoInscricao;
+    linha += this.padLeft(docPagador, 14, '0');
+    linha += this.sanitizeAlpha(nomePagador, 40);
+    linha += this.sanitizeAlpha(endereco, 38);
+    linha += this.sanitizeAlpha(pagador.uf || '', 2);
+    linha += this.padLeft(cep, 8, '0');
+    linha += this.sanitizeAlpha(pgto.mensagem || pgto.descricao || 'REFERENTE AO ALUGUEL MENSAL', 70);
+    linha += this.padLeft(this.sequenciaRegistro.toString(), 6, '0');
 
     this.linhas.push(this.padRight(linha, 400).substring(0, 400));
+    this.sequenciaRegistro++;
   }
 
   addTrailer() {
     let linha = '';
-    
-    // 001-001: Identificação do Registro (9 = Trailer)
-    linha += '9'; 
-    
-    // 002-394: Pode variar, a maioria utiliza brancos, porém incluí os totalizadores padrões FEBRABAN no fim da linha vazia
-    linha += this.padRight('', 378); 
-    
-    // Muitas vezes o banco requer o totalizador de valor no fim do trailer (pos 380-394):
-    linha += this.formatMoney(this.totalValor);
-    
-    // 395-400: Sequencial do Registro
-    linha += this.padLeft(this.sequenciaRegistro++, 6);
+    linha += '9';
+    linha += this.padLeft(this.quantidadePagamentos.toString(), 6, '0');
+    linha += this.padRight('', 387);
+    linha += this.padLeft(this.sequenciaRegistro.toString(), 6, '0');
 
     this.linhas.push(this.padRight(linha, 400).substring(0, 400));
   }
