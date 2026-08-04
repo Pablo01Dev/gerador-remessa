@@ -368,7 +368,7 @@ window.gerarCNAB = function() {
     }
 
     try {
-        builderCNAB = new window.Cnab240InterBuilder({
+        builderCNAB = new window.Cnab400InterBuilder({
             nome: nomeEmpresa, cnpj: cnpj, agencia: agencia, conta_bancaria: conta, dv: dv
         });
 
@@ -380,7 +380,7 @@ window.gerarCNAB = function() {
         document.getElementById('resultadoSection').style.display = 'block';
         document.getElementById('resultadoSection').scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
-        alert(`❌ Erro ao gerar CNAB: ${error.message}`);
+        alert(`❌ Erro ao gerar CNAB 400: ${error.message}`);
     }
 };
 
