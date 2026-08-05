@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador CNAB 400 - Banco Inter</title>
+    <title>Gerador de Remessa - Banco Inter</title>
     <link rel="stylesheet" href="styles.css">
     <script async src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -12,6 +12,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
     <script src="cnab/utils.js"></script>
+    <script src="cnab/Cnab240InterBuilder.js"></script>
     <script src="cnab/Cnab400InterBuilder.js"></script>
     <!-- Os scripts app.js e config.js agora são carregados no final do body -->
 </head>
@@ -90,9 +91,16 @@
 
             <!-- Gerar CNAB -->
             <section class="card card-acao">
+                <div class="form-group">
+                    <label for="formatoCNAB">Formato do arquivo de remessa</label>
+                    <select id="formatoCNAB" aria-label="Formato do arquivo de remessa">
+                        <option value="240" selected>CNAB 240</option>
+                        <option value="400">CNAB 400</option>
+                    </select>
+                </div>
                 <div class="acoes">
                     <button id="btnGerarCNAB" class="btn-primary btn-large">
-                        🚀 Gerar Arquivo CNAB 400
+                        🚀 Gerar Arquivo CNAB 240
                     </button>
                     <button id="btnLimparTudo" class="btn-secondary">
                         🗑️ Limpar Tudo
@@ -109,7 +117,7 @@
                 </div>
                 
                 <div class="textarea-container">
-                    <label for="cnabOutput">Arquivo CNAB 400:</label>
+                    <label for="cnabOutput">Arquivo CNAB <span id="formatoCNABResultado">240</span>:</label>
                     <textarea id="cnabOutput" readonly></textarea>
                 </div>
 

@@ -350,6 +350,7 @@ window.removerBoleto = function(index) {
 };
 
 window.gerarCNAB = function() {
+    const formatoCNAB = document.getElementById('formatoCNAB').value;
     salvarConfiguracaoEmpresa(); // Garante que salva ao gerar também
 
     const nomeEmpresa = document.getElementById('nomeEmpresa').value.trim();
@@ -368,7 +369,11 @@ window.gerarCNAB = function() {
     }
 
     try {
-        builderCNAB = new window.Cnab400InterBuilder({
+        const Builder = formatoCNAB === '400'
+            ? window.Cnab400InterBuilder
+            : window.Cnab240InterBuilder;
+
+        builderCNAB = new Builder({
             nome: nomeEmpresa, cnpj: cnpj, agencia: agencia, conta_bancaria: conta, dv: dv
         });
 
@@ -377,6 +382,7 @@ window.gerarCNAB = function() {
         const arquivo = builderCNAB.build();
         document.getElementById('cnabOutput').value = arquivo;
         document.getElementById('qtdLinhas').textContent = arquivo.split('\n').length;
+        document.getElementById('formatoCNABResultado').textContent = formatoCNAB;
         document.getElementById('resultadoSection').style.display = 'block';
         document.getElementById('resultadoSection').scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
@@ -413,11 +419,12 @@ window.copiarCNAB = function() {
 
 window.baixarCNAB = function() {
     const arquivo = document.getElementById('cnabOutput').value;
+    const formatoCNAB = document.getElementById('formatoCNAB').value;
     const blob = new Blob([arquivo], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `remessa_${new Date().toISOString().slice(0,10)}.rem`;
+    link.download = `remessa_cnab${formatoCNAB}_${new Date().toISOString().slice(0,10)}.rem`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -441,6 +448,9 @@ function inicializarApp() {
     // 3. Botões
     document.getElementById('btnProcessarBoletos').addEventListener('click', window.processarBoletos);
     document.getElementById('btnGerarCNAB').addEventListener('click', window.gerarCNAB);
+    document.getElementById('formatoCNAB').addEventListener('change', (event) => {
+        document.getElementById('btnGerarCNAB').textContent = `Gerar Arquivo CNAB ${event.target.value}`;
+    });
     document.getElementById('btnLimparTudo').addEventListener('click', window.limparTudo);
     document.getElementById('btnCopiarCNAB').addEventListener('click', window.copiarCNAB);
     document.getElementById('btnBaixarCNAB').addEventListener('click', window.baixarCNAB);

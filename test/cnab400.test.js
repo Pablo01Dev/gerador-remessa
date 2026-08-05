@@ -4,10 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('o app usa o builder de CNAB400', () => {
+test('o app permite escolher entre os builders CNAB240 e CNAB400', () => {
   const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-  assert.match(appCode, /new window\.Cnab400InterBuilder/);
-  assert.match(appCode, /CNAB 400/);
+  const htmlCode = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(appCode, /window\.Cnab400InterBuilder/);
+  assert.match(appCode, /window\.Cnab240InterBuilder/);
+  assert.match(htmlCode, /id="formatoCNAB"/);
+  assert.match(htmlCode, /value="240"/);
+  assert.match(htmlCode, /value="400"/);
 });
 
 test('o builder CNAB400 gera linhas com 400 caracteres', () => {
